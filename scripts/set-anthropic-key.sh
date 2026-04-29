@@ -28,7 +28,7 @@ docker compose --env-file .env run --rm --no-deps --entrypoint node openclaw-gat
   dist/index.js onboard \
   --non-interactive \
   --mode local \
-  --auth-choice apiKey \
+  --auth-choice anthropic-api-key \
   --anthropic-api-key "$ANTHROPIC_API_KEY" \
   --secret-input-mode plaintext \
   --gateway-port 18789 \
