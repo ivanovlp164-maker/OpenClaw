@@ -160,6 +160,18 @@ NODE_GID="$(sudo -u "$DEPLOY_USER" -H bash -lc \
   | tr -d '\r\n')"
 ok "Container UID:GID = ${NODE_UID}:${NODE_GID}"
 chown -R "${NODE_UID}:${NODE_GID}" "${INSTALL_DIR}/state"
+
+# The 'plugin-runtime-deps' is a Docker named volume; Docker creates its
+# initial directory as root, so the in-container node user gets EACCES on
+# 'mkdir' for every bundled plugin (anthropic, telegram, etc.). Run a
+# one-shot root container against the same volume and chown its mountpoint
+# to the node UID, so plugins can install their runtime deps.
+log "Aligning plugin-runtime-deps volume ownership…"
+sudo -u "$DEPLOY_USER" -H bash -lc "cd '$INSTALL_DIR' && \
+  docker compose --env-file .env run --rm --user 0:0 --no-deps --entrypoint chown openclaw-gateway \
+    -R '${NODE_UID}:${NODE_GID}' /var/lib/openclaw/plugin-runtime-deps" \
+  || warn "plugin-runtime-deps chown failed; expect plugin EACCES errors."
+
 # Repo + .env stay owned by the deploy user.
 chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${INSTALL_DIR}/.git" "${INSTALL_DIR}/scripts" 2>/dev/null || true
 chown "${DEPLOY_USER}:${DEPLOY_USER}" "${ENV_FILE}"
