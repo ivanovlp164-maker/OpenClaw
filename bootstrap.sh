@@ -116,9 +116,10 @@ fi
 chmod 600 "$ENV_FILE"
 chown "${DEPLOY_USER}:${DEPLOY_USER}" "$ENV_FILE"
 
-# State dirs (config + workspace volumes)
+# State dirs (config + workspace volumes).
+# Ownership is set AFTER the image is pulled (we need the container's
+# node-user UID/GID to match the bind-mount), see step 11.
 mkdir -p "${INSTALL_DIR}/state/config" "${INSTALL_DIR}/state/workspace"
-chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${INSTALL_DIR}/state"
 
 # ── 9. UFW (firewall) ─────────────────────────────────────────────────────
 log "Configuring firewall (UFW)…"
@@ -142,9 +143,40 @@ TS_IP4="$(tailscale ip -4 2>/dev/null | head -1 || echo '')"
 TS_NAME="$(tailscale status --json 2>/dev/null | jq -r '.Self.HostName // empty')"
 ok "Tailscale: ${TS_NAME:-?} @ ${TS_IP4:-?}"
 
-# ── 11. Pull image and start gateway ──────────────────────────────────────
+# ── 11. Pull image, align bind-mount ownership, start gateway ────────────
 log "Pulling OpenClaw image…"
 sudo -u "$DEPLOY_USER" -H bash -lc "cd '$INSTALL_DIR' && docker compose --env-file .env pull"
+
+# Detect the container's runtime UID/GID. Some VPS images ship with a
+# default user at UID 1000, pushing our 'openclaw' to 1001 — that breaks
+# the bind-mounted /home/node/.openclaw. Chown the bind targets to whatever
+# UID:GID the gateway image actually runs as.
+log "Aligning state ownership with container UID…"
+NODE_UID="$(sudo -u "$DEPLOY_USER" -H bash -lc \
+  "cd '$INSTALL_DIR' && docker compose --env-file .env run --rm --no-deps --entrypoint id openclaw-gateway -u" \
+  | tr -d '\r\n')"
+NODE_GID="$(sudo -u "$DEPLOY_USER" -H bash -lc \
+  "cd '$INSTALL_DIR' && docker compose --env-file .env run --rm --no-deps --entrypoint id openclaw-gateway -g" \
+  | tr -d '\r\n')"
+ok "Container UID:GID = ${NODE_UID}:${NODE_GID}"
+chown -R "${NODE_UID}:${NODE_GID}" "${INSTALL_DIR}/state"
+# Repo + .env stay owned by the deploy user.
+chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${INSTALL_DIR}/.git" "${INSTALL_DIR}/scripts" 2>/dev/null || true
+chown "${DEPLOY_USER}:${DEPLOY_USER}" "${ENV_FILE}"
+
+# Run the official non-interactive onboarding to seed config (Anthropic
+# key + provider keys can be added later via ./scripts/set-anthropic-key.sh
+# or onboard-telegram.sh; here we just make sure gateway has a valid
+# minimal config so it doesn't crash-loop on 'Missing config').
+log "Running initial onboarding (no provider yet)…"
+sudo -u "$DEPLOY_USER" -H bash -lc "cd '$INSTALL_DIR' && \
+  docker compose --env-file .env run --rm --no-deps --entrypoint node openclaw-gateway \
+    dist/index.js onboard --non-interactive --mode local --auth-choice skip \
+    --gateway-port 18789 --gateway-bind lan --gateway-auth token \
+    --gateway-token-ref-env OPENCLAW_GATEWAY_TOKEN \
+    --skip-bootstrap --skip-skills --skip-health --accept-risk" || \
+  warn "Initial onboarding skipped/failed — re-run ./scripts/set-anthropic-key.sh after bootstrap."
+
 log "Starting OpenClaw gateway…"
 sudo -u "$DEPLOY_USER" -H bash -lc "cd '$INSTALL_DIR' && docker compose --env-file .env up -d"
 
