@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Set ANTHROPIC_API_KEY in .env and restart gateway.
+# Configure Anthropic as the LLM provider.
+# Idempotent: re-run to rotate the key.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -9,7 +10,7 @@ if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
 fi
 [[ -n "$ANTHROPIC_API_KEY" ]] || { echo "[x] empty key"; exit 1; }
 
-# Replace or append in .env
+# Persist in .env so the gateway container picks it up via env on restart.
 if grep -q '^ANTHROPIC_API_KEY=' .env; then
   sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}|" .env
 else
@@ -17,11 +18,28 @@ else
 fi
 chmod 600 .env
 
-# Tell OpenClaw which provider/model is primary.
-docker compose --env-file .env run --rm --no-deps --entrypoint node openclaw-gateway \
-  dist/index.js config set --batch-json \
-  '[{"path":"providers.anthropic.apiKey","value":"'"${ANTHROPIC_API_KEY}"'"},
-    {"path":"agents.defaults.provider","value":"anthropic"}]'
+# Use the official non-interactive onboarding to wire Anthropic into the
+# config (auth profile + default model). Reference:
+#   docs/start/wizard-cli-automation.md
+#   docs/providers/anthropic.md
+docker compose --env-file .env run --rm --no-deps openclaw-cli onboard \
+  --non-interactive \
+  --mode local \
+  --auth-choice apiKey \
+  --anthropic-api-key "$ANTHROPIC_API_KEY" \
+  --secret-input-mode plaintext \
+  --gateway-port 18789 \
+  --gateway-bind lan \
+  --skip-bootstrap \
+  --skip-skills \
+  --skip-health \
+  --accept-risk
 
-docker compose --env-file .env up -d
-echo "[ok] Anthropic key applied; gateway restarted."
+# Restart gateway so the new config is picked up.
+docker compose --env-file .env up -d --force-recreate openclaw-gateway
+
+# Quick sanity check.
+docker compose --env-file .env run --rm --no-deps openclaw-cli \
+  models list --provider anthropic 2>&1 | head -20 || true
+
+echo "[ok] Anthropic configured; gateway restarted."
