@@ -1,0 +1,20 @@
+{
+  "defaultMode": "bypassPermissions",
+  "effortLevel": "high",
+  "enabledPlugins": {
+    "telegram@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "mcp__plugin_telegram_telegram__reply",
+      "mcp__plugin_telegram_telegram__react",
+      "mcp__plugin_telegram_telegram__edit_message"
+    ],
+    "deny": []
+  }
+}

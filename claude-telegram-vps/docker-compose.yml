@@ -1,0 +1,38 @@
+services:
+  claude-telegram:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: claude-telegram-vps:latest
+    container_name: claude-telegram
+    restart: unless-stopped
+    init: true
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    environment:
+      HOME: /home/agent
+      TERM: xterm-256color
+      BUN_INSTALL: /home/agent/.bun
+      PATH: /home/agent/.local/bin:/home/agent/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    volumes:
+      - claude-config:/home/agent/.claude
+      - claude-bun:/home/agent/.bun
+      - claude-workspace:/home/agent/workspace
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'claude --channels' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  claude-config:
+  claude-bun:
+  claude-workspace:
