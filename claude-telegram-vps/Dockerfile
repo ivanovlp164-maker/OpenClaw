@@ -28,6 +28,10 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 RUN mkdir -p /home/agent/.claude /home/agent/.claude/channels/telegram /home/agent/workspace
 
 COPY --chown=agent:agent settings.json /home/agent/.claude/settings.json
+COPY --chown=root:root entrypoint.sh /usr/local/bin/entrypoint.sh
+USER root
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
+USER agent
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]
 CMD ["/usr/bin/script", "-qfc", "/home/agent/.local/bin/claude --channels plugin:telegram@claude-plugins-official", "/home/agent/.claude/run.log"]
