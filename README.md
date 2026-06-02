@@ -58,10 +58,16 @@ docker-compose.yml              # gateway + cli services (ghcr.io image)
 scripts/
   status.sh                     # docker ps + /healthz
   logs.sh                       # tail logs
-  update.sh                     # pull repo + image, restart
+  update.sh                     # pull repo + image, sync workspace, restart
   set-anthropic-key.sh          # set ANTHROPIC_API_KEY
   onboard-telegram.sh           # add Telegram channel
+  sync-workspace.sh             # push git workspace -> live agent workspace
   backup.sh                     # snapshot ./state/
+workspace/                      # de-identified agent baseline (repo is public!)
+  SOUL.md  AGENTS.md  USER.md   #   persona / operations / profile template
+  IDENTITY.md  HEARTBEAT.md     #   identity / proactive rhythm (CEO push)
+  MEMORY.md  memory/            #   memory templates (real memory = VPS only)
+  skills/                       #   custom skills (synced to live agent)
 .github/workflows/
   deploy.yml                    # on push to main → ssh+update
   restart.yml                   # manual: ssh+restart

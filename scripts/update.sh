@@ -7,6 +7,10 @@ git fetch --quiet origin
 git pull --ff-only --quiet origin "$(git rev-parse --abbrev-ref HEAD)"
 
 docker compose --env-file .env pull
+
+# Sync git-managed agent workspace (personality, skills, memory seeds).
+# Non-destructive to runtime memory. See scripts/sync-workspace.sh.
+./scripts/sync-workspace.sh || echo "[!] workspace sync failed; continuing"
 docker compose --env-file .env up -d --remove-orphans
 docker image prune -f >/dev/null
 

@@ -117,6 +117,61 @@ set `OPENCLAW_GATEWAY_BIND=localhost` in `.env` and rely on Tailscale SSH or
 From any laptop or use [https://shodan.io] / portchecker.io for your VPS IP.
 Only port 22 should answer. Tailscale uses UDP 41641 — that's expected.
 
+## Edit the agent (personality / memory / skills)
+
+The repo is **public**, so `workspace/` holds only a de-identified baseline.
+The live persona and private memory live on the VPS and are **never clobbered**
+by deploy (persona/memory are seed-only; only skills are overwritten). See
+`workspace/README.md`.
+
+```bash
+# Apply git changes to workspace/ without a full image pull:
+./scripts/sync-workspace.sh
+# (update.sh also runs this automatically on every deploy)
+```
+
+- **Add/Update skills** → edit `workspace/skills/<group>/<skill>/SKILL.md`,
+  push → `deploy`. Skills update on the live agent.
+- **Change live persona / profile** → don't put personal data in this public
+  repo. Edit on the VPS directly (`state/workspace/SOUL.md`, `USER.md`, …) or
+  just tell the agent in chat — it writes its own memory on the VPS.
+- The git baseline (`SOUL.md`, `USER.md`, …) only seeds a **fresh** install.
+
+## Export the agent's accumulated memory (for analysis / handover)
+
+The live memory the agent writes lives on the VPS at
+`state/workspace/` (config at `state/config/`) — it is gitignored and never
+leaves the VPS unless you export it. To hand it over for analysis:
+
+```bash
+cd /opt/openclaw
+# Quick read of what the agent currently knows about you:
+cat state/workspace/MEMORY.md
+ls -la state/workspace/memory/ && cat state/workspace/memory/*.md
+cat state/workspace/USER.md
+
+# Bundle the whole agent state into one archive:
+./scripts/backup.sh           # -> backups/openclaw-state-*.tar.zst
+
+# Ask the agent itself to summarise what it knows (from Telegram or CLI):
+docker compose run --rm openclaw-cli sessions list
+```
+
+To bring an export into this repo for analysis, copy ONLY non-secret memory
+files to a throwaway branch (review for private data first), e.g.:
+
+```bash
+mkdir -p export/memory
+cp state/workspace/MEMORY.md state/workspace/USER.md export/ 2>/dev/null || true
+cp state/workspace/memory/*.md export/memory/ 2>/dev/null || true
+git checkout -b export/agent-memory && git add -f export/ && \
+  git commit -m "Agent memory export for analysis" && \
+  git push -u origin export/agent-memory
+```
+
+> ⚠️ The export may contain personal info. Push it only to a private repo,
+> review before sharing, and delete the branch when done.
+
 ## Useful `openclaw-cli` commands
 
 ```bash
