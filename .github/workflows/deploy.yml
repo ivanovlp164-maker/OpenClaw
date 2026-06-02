@@ -7,6 +7,7 @@ on:
       - "docker-compose.yml"
       - ".env.example"
       - "scripts/**"
+      - "workspace/**"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 

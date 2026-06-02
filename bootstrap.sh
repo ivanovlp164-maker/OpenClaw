@@ -189,6 +189,11 @@ sudo -u "$DEPLOY_USER" -H bash -lc "cd '$INSTALL_DIR' && \
     --skip-bootstrap --skip-skills --skip-health --accept-risk" || \
   warn "Initial onboarding skipped/failed — re-run ./scripts/set-anthropic-key.sh after bootstrap."
 
+# Seed the git-managed agent workspace (personality, skills, memory seeds).
+log "Syncing agent workspace (personality + skills + memory seeds)…"
+sudo -u "$DEPLOY_USER" -H bash -lc "cd '$INSTALL_DIR' && ./scripts/sync-workspace.sh" || \
+  warn "Workspace sync skipped/failed — re-run ./scripts/sync-workspace.sh after bootstrap."
+
 log "Starting OpenClaw gateway…"
 sudo -u "$DEPLOY_USER" -H bash -lc "cd '$INSTALL_DIR' && docker compose --env-file .env up -d"
 

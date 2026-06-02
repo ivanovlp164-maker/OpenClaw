@@ -6,3 +6,10 @@ state/
 *.pem
 *.key
 .DS_Store
+
+# Telegram userbot: login sessions & chat dumps must NEVER be committed.
+*.session
+*.session-journal
+export/
+tools/telegram-userbot/export/
+.venv/
