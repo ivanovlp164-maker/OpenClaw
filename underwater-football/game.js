@@ -330,6 +330,20 @@ function readInput() {
   input.kick = touchBtn.kick || !!keys['KeyK'] || !!keys['KeyE'];
 }
 
+// Сглаженный ввод: убирает рывки джойстика, даёт точный контроль у центра
+var smooth = { mx: 0, mz: 0, y: 0 };
+function smoothInput(dt) {
+  var k = Math.min(1, 11 * dt);
+  var tx = input.mx * Math.abs(input.mx);       // квадратичная кривая отклика
+  var tz = input.mz * Math.abs(input.mz);
+  var ty = (input.up ? 1 : 0) - (input.down ? 1 : 0);
+  // мёртвая зона джойстика
+  if (Math.hypot(tx, tz) < 0.04) { tx = 0; tz = 0; }
+  smooth.mx += (tx - smooth.mx) * k;
+  smooth.mz += (tz - smooth.mz) * k;
+  smooth.y += (ty - smooth.y) * k;
+}
+
 // ============================== ИГРОВАЯ ЛОГИКА ==============================
 function clampToPool(p, r) {
   if (p.pos.x < -POOL.hx + r) { p.pos.x = -POOL.hx + r; p.vel.x = Math.abs(p.vel.x) * 0.2; }
@@ -350,16 +364,15 @@ function updateHuman(p, dt) {
     p.vel.y += 4.0 * dt; // всплывает сам
     return;
   }
-  // движение относительно камеры
+  // движение относительно камеры (сглаженный ввод)
   var fwd = new THREE.Vector3();
   camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
   var right = new THREE.Vector3(fwd.z, 0, -fwd.x).negate();
   var acc = new THREE.Vector3();
-  acc.addScaledVector(fwd, -input.mz);
-  acc.addScaledVector(right, input.mx);
+  acc.addScaledVector(fwd, -smooth.mz);
+  acc.addScaledVector(right, smooth.mx);
   if (acc.lengthSq() > 1) acc.normalize();
-  if (input.up) acc.y += 1;
-  if (input.down) acc.y -= 1;
+  acc.y += smooth.y;
   p.vel.addScaledVector(acc, PLAYER_ACCEL * dt);
   p.vel.multiplyScalar(1 - Math.min(1, WATER_DRAG_P * dt));
   if (p.vel.length() > PLAYER_MAXSPD) p.vel.setLength(PLAYER_MAXSPD);
@@ -581,11 +594,14 @@ function updateSurface(dt) {
 
 // ============================== КАМЕРА ==============================
 var camPos = new THREE.Vector3(0, 8, 14);
+var camYaw = 0;
 function updateCamera(dt) {
-  var back = new THREE.Vector3(Math.sin(human.yaw), 0, Math.cos(human.yaw)).multiplyScalar(-7.5);
+  // камера догоняет поворот игрока плавно — без резких разворотов
+  camYaw = lerpAngle(camYaw, human.yaw, Math.min(1, 2.3 * dt));
+  var back = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw)).multiplyScalar(-7.5);
   var want = human.pos.clone().add(back);
   want.y = Math.min(POOL.top - 0.6, Math.max(2, human.pos.y + 2.6));
-  camPos.lerp(want, Math.min(1, 3.5 * dt));
+  camPos.lerp(want, Math.min(1, 4.2 * dt));
   // не выходить за стены
   camPos.x = Math.max(-POOL.hx + 1, Math.min(POOL.hx - 1, camPos.x));
   camPos.z = Math.max(-POOL.hz + 1, Math.min(POOL.hz - 1, camPos.z));
@@ -741,6 +757,7 @@ function tick(now) {
     }
 
     readInput();
+    smoothInput(dt);
     updateTeamDuty(TEAM_BLUE);
     updateTeamDuty(TEAM_ORANGE);
     players.forEach(function (p) {

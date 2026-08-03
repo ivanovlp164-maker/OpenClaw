@@ -50,15 +50,29 @@
   #joy-knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%;
     background: rgba(255,255,255,.45); }
 
-  /* Кнопки справа */
-  .btn-col { position: absolute; right: calc(14px + env(safe-area-inset-right));
-    bottom: calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; z-index: 6; }
-  .abtn { width: 68px; height: 68px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5);
-    background: rgba(255,255,255,.16); color: #fff; font-size: 26px; font-weight: 800;
+  /* Кнопки справа: удар — под большой палец в углу, вверх/вниз рядом */
+  .abtn { position: absolute; z-index: 6; border-radius: 50%; border: 2px solid rgba(255,255,255,.5);
+    background: rgba(255,255,255,.16); color: #fff; font-weight: 800;
     display: flex; align-items: center; justify-content: center; }
-  .abtn.pressed { background: rgba(255,255,255,.42); }
-  #btn-kick { width: 84px; height: 84px; font-size: 38px; background: rgba(255,120,40,.35); border-color: rgba(255,170,90,.8); }
+  .abtn.pressed { background: rgba(255,255,255,.42); transform: scale(.94); }
+  #btn-kick { width: 96px; height: 96px; font-size: 44px;
+    right: calc(18px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom));
+    background: rgba(255,120,40,.35); border-color: rgba(255,170,90,.8); }
   #btn-kick.ready { background: rgba(80,220,120,.55); border-color: #7dffab; }
+  #btn-up { width: 70px; height: 70px; font-size: 28px;
+    right: calc(32px + env(safe-area-inset-right)); bottom: calc(132px + env(safe-area-inset-bottom)); }
+  #btn-down { width: 70px; height: 70px; font-size: 28px;
+    right: calc(132px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); }
+
+  /* Портрет: просим повернуть телефон */
+  #rotate { display: none; position: absolute; inset: 0; z-index: 40;
+    background: #063a5e; color: #fff; align-items: center; justify-content: center;
+    text-align: center; font-size: 21px; font-weight: 700; line-height: 1.6; padding: 24px; }
+  #rotate .phone { font-size: 56px; display: block; margin-bottom: 12px;
+    animation: turn 1.6s ease-in-out infinite; }
+  @keyframes turn { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+  @media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(90deg); } }
+  @media (orientation: portrait) { #rotate { display: flex; } }
   #hint-left { position: absolute; left: 16px; bottom: calc(30px + env(safe-area-inset-bottom));
     color: rgba(255,255,255,.45); font-size: 12px; z-index: 3; pointer-events: none; }
 
@@ -96,11 +110,12 @@
 <div id="joy-base"><div id="joy-knob"></div></div>
 
 <!-- Кнопки -->
-<div class="btn-col">
-  <button class="abtn" id="btn-up">▲</button>
-  <button class="abtn" id="btn-kick">⚽</button>
-  <button class="abtn" id="btn-down">▼</button>
-</div>
+<button class="abtn" id="btn-up">▲</button>
+<button class="abtn" id="btn-kick">⚽</button>
+<button class="abtn" id="btn-down">▼</button>
+
+<!-- Портретный режим -->
+<div id="rotate"><div><span class="phone">📱</span>Поверни телефон горизонтально —<br>играем в ландшафте</div></div>
 
 <!-- Меню -->
 <div class="overlay" id="menu">
