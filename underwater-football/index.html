@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Подводный футбол</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; position: fixed; background: #063a5e;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: none;
+    -webkit-user-select: none; user-select: none; }
+  #game { position: absolute; inset: 0; }
+  #game canvas { display: block; }
+
+  /* HUD */
+  .hud { position: absolute; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); z-index: 5; pointer-events: none; }
+  #score { top: calc(6px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    font-size: 26px; font-weight: 800; }
+  #timer { top: calc(38px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    font-size: 13px; opacity: .9; }
+  #coins { top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left));
+    font-size: 16px; font-weight: 700; }
+  #btn-pause { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right));
+    z-index: 6; width: 42px; height: 42px; border-radius: 12px; border: none;
+    background: rgba(255,255,255,.18); color: #fff; font-size: 20px; }
+
+  /* шкалы: воздух и энергия — под таймером */
+  #o2-bar { position: absolute; top: calc(58px + env(safe-area-inset-top)); left: 50%;
+    transform: translateX(-50%); width: 200px; height: 11px; border-radius: 7px;
+    background: rgba(0,0,0,.35); border: 1.5px solid rgba(255,255,255,.5); overflow: hidden; z-index: 5; }
+  #o2-fill { height: 100%; width: 100%; background: #3ad1ff; border-radius: 5px; transition: background .3s; }
+  #o2-bar.low { animation: blink .5s infinite alternate; }
+  @keyframes blink { from { border-color: rgba(255,255,255,.5); } to { border-color: #ff4d4d; } }
+  #st-bar { position: absolute; top: calc(73px + env(safe-area-inset-top)); left: 50%;
+    transform: translateX(-50%); width: 200px; height: 7px; border-radius: 5px;
+    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.4); overflow: hidden; z-index: 5; }
+  #st-fill { height: 100%; width: 100%; background: #ffd23a; border-radius: 4px; }
+  .bar-ico { position: absolute; z-index: 5; font-size: 11px; left: calc(50% - 118px); pointer-events: none; }
+  #o2-ico { top: calc(56px + env(safe-area-inset-top)); }
+  #st-ico { top: calc(70px + env(safe-area-inset-top)); }
+
+  #team-o2 { top: calc(36px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: flex; gap: 4px; }
+  .mate { width: 30px; height: 6px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; }
+  .mate.keeper { border: 1px solid #27e0b0; }
+  .mate-fill { height: 100%; background: #3ad1ff; }
+
+  #breathe-hint { display: none; top: 40%; left: 50%; transform: translateX(-50%);
+    font-size: 15px; font-weight: 700; color: #b8ffde; }
+  #message { top: 30%; left: 50%; transform: translateX(-50%); font-size: 19px; font-weight: 800;
+    opacity: 0; transition: opacity .4s; white-space: nowrap; }
+
+  /* стрелка на мяч */
+  #ball-arrow { display: none; position: absolute; z-index: 5; pointer-events: none;
+    width: 44px; height: 30px; line-height: 30px; text-align: center; font-size: 22px;
+    color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.7); }
+  #ball-arrow::after { content: '⚽➤'; }
+
+  /* Левый джойстик */
+  #joy-base { display: none; position: absolute; width: 120px; height: 120px; border-radius: 50%;
+    background: rgba(255,255,255,.10); border: 2px solid rgba(255,255,255,.35); z-index: 4; pointer-events: none; }
+  #joy-knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%;
+    background: rgba(255,255,255,.45); }
+
+  /* Правый джойстик-«мяч»: вверх/вниз + камера */
+  #rjoy-base { position: absolute; z-index: 6; width: 116px; height: 116px; border-radius: 50%;
+    right: calc(14px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.10); border: 2px solid rgba(255,255,255,.35);
+    display: flex; align-items: center; justify-content: center; }
+  #rjoy-knob { width: 58px; height: 58px; border-radius: 50%; font-size: 40px; line-height: 58px;
+    text-align: center; background: radial-gradient(circle at 35% 30%, #fff, #cfd8e0 60%, #9aa7b3);
+    box-shadow: 0 2px 8px rgba(0,0,0,.4); pointer-events: none; }
+  .rjoy-hint { position: absolute; color: rgba(255,255,255,.55); font-size: 11px; pointer-events: none; }
+  #rjoy-up { top: 2px; left: 50%; transform: translateX(-50%); }
+  #rjoy-down { bottom: 2px; left: 50%; transform: translateX(-50%); }
+
+  /* Кнопки действий */
+  .abtn { position: absolute; z-index: 6; border-radius: 50%; border: 2px solid rgba(255,255,255,.5);
+    background: rgba(255,255,255,.16); color: #fff; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; flex-direction: column; }
+  .abtn.pressed { background: rgba(255,255,255,.42); transform: scale(.94); }
+  .abtn.ready { background: rgba(80,220,120,.5); border-color: #7dffab; }
+  .abtn small { font-size: 10px; font-weight: 700; margin-top: -2px; }
+  #btn-pass { width: 62px; height: 62px; font-size: 20px;
+    right: calc(148px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom)); }
+  #btn-shot { width: 70px; height: 70px; font-size: 24px;
+    right: calc(150px + env(safe-area-inset-right)); bottom: calc(84px + env(safe-area-inset-bottom));
+    background: rgba(255,120,40,.35); border-color: rgba(255,170,90,.8); }
+  #btn-lob { width: 58px; height: 58px; font-size: 18px;
+    right: calc(146px + env(safe-area-inset-right)); bottom: calc(166px + env(safe-area-inset-bottom)); }
+  #btn-sprint { width: 58px; height: 58px; font-size: 24px;
+    right: calc(42px + env(safe-area-inset-right)); bottom: calc(140px + env(safe-area-inset-bottom));
+    background: rgba(255,210,58,.25); border-color: rgba(255,210,58,.7); }
+
+  /* шкала силы удара */
+  #power-wrap { display: none; position: absolute; z-index: 6; width: 12px; height: 140px;
+    right: calc(226px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom));
+    background: rgba(0,0,0,.35); border: 1.5px solid rgba(255,255,255,.5); border-radius: 7px;
+    overflow: hidden; display: none; }
+  #power-fill { position: absolute; bottom: 0; width: 100%; height: 0;
+    background: linear-gradient(to top, #7dffab, #ffd23a, #ff4d4d); }
+
+  #hint-left { position: absolute; left: 16px; bottom: calc(30px + env(safe-area-inset-bottom));
+    color: rgba(255,255,255,.45); font-size: 12px; z-index: 3; pointer-events: none; }
+
+  /* Портрет: просим повернуть телефон */
+  #rotate { display: none; position: absolute; inset: 0; z-index: 40;
+    background: #063a5e; color: #fff; align-items: center; justify-content: center;
+    text-align: center; font-size: 21px; font-weight: 700; line-height: 1.6; padding: 24px; }
+  #rotate .phone { font-size: 56px; display: block; margin-bottom: 12px;
+    animation: turn 1.6s ease-in-out infinite; }
+  @keyframes turn { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+  @media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(90deg); } }
+  @media (orientation: portrait) { #rotate { display: flex; } }
+
+  /* Оверлеи */
+  .overlay { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+    background: rgba(3,28,48,.82); backdrop-filter: blur(4px); }
+  .panel { background: #0b4a77; border: 2px solid #2e88c8; border-radius: 18px; padding: 22px 20px;
+    color: #fff; text-align: center; width: min(88vw, 400px); max-height: 92vh; overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .panel h1 { font-size: 24px; margin-bottom: 8px; }
+  .panel h2 { font-size: 14px; margin: 12px 0 6px; opacity: .85; text-transform: uppercase; letter-spacing: .5px; }
+  .panel p { font-size: 14px; opacity: .9; margin: 6px 0; line-height: 1.45; }
+  .panel .big { font-size: 32px; font-weight: 800; margin: 8px 0; }
+  .pbtn { display: block; width: 100%; margin-top: 12px; padding: 13px; border: none; border-radius: 12px;
+    background: #2fb56b; color: #fff; font-size: 17px; font-weight: 700; }
+  .pbtn.alt { background: #2e88c8; }
+  .pbtn:disabled { background: #4a6b84; opacity: .6; }
+  .seg { display: flex; gap: 8px; }
+  .seg button { flex: 1; padding: 11px 4px; border: 2px solid #2e88c8; border-radius: 10px;
+    background: transparent; color: #fff; font-size: 14px; font-weight: 700; }
+  .seg button.sel { background: #2e88c8; }
+  #end, #setup, #halftime { display: none; }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<!-- HUD -->
+<div id="score" class="hud">0 : 0</div>
+<div id="timer" class="hud">1-й тайм · 0′</div>
+<div id="coins" class="hud">🪙 0</div>
+<div id="team-o2" class="hud"></div>
+<button id="btn-pause">⏸</button>
+<div id="o2-ico" class="bar-ico hud">💨</div>
+<div id="o2-bar"><div id="o2-fill"></div></div>
+<div id="st-ico" class="bar-ico hud">⚡</div>
+<div id="st-bar"><div id="st-fill"></div></div>
+<div id="breathe-hint" class="hud">😮‍💨 Дышим! Воздух восстанавливается</div>
+<div id="message" class="hud"></div>
+<div id="ball-arrow"></div>
+<div id="hint-left">◐ веди пальцем слева — плыть</div>
+
+<!-- Левый джойстик -->
+<div id="joy-base"><div id="joy-knob"></div></div>
+
+<!-- Правый джойстик-«мяч» -->
+<div id="rjoy-base">
+  <span class="rjoy-hint" id="rjoy-up">▲ всплыть</span>
+  <div id="rjoy-knob">⚽</div>
+  <span class="rjoy-hint" id="rjoy-down">▼ нырять</span>
+</div>
+
+<!-- Кнопки действий -->
+<button class="abtn" id="btn-lob">🎯<small>НАВЕС</small></button>
+<button class="abtn" id="btn-shot">💥<small>УДАР</small></button>
+<button class="abtn" id="btn-pass">🤝<small>ПАС</small></button>
+<button class="abtn" id="btn-sprint">⚡</button>
+<div id="power-wrap"><div id="power-fill"></div></div>
+
+<!-- Портретный режим -->
+<div id="rotate"><div><span class="phone">📱</span>Поверни телефон горизонтально —<br>играем в ландшафте</div></div>
+
+<!-- Меню -->
+<div class="overlay" id="menu">
+  <div class="panel">
+    <h1>🌊 Подводный футбол</h1>
+    <p>5 на 5 с вратарями. Два тайма по 44 игровые минуты. Плавай в 3D, пасуй, бей, навешивай — и не забывай дышать!</p>
+    <p>Удерживай кнопку удара — сила растёт. Кончается воздух — всплывай с ускорением. Не успел — тебя откачают медики.</p>
+    <button class="pbtn" id="btn-start">▶ Играть</button>
+    <button class="pbtn alt" id="btn-shop">🛒 Магазин</button>
+  </div>
+</div>
+
+<!-- Выбор сложности и стратегии -->
+<div class="overlay" id="setup">
+  <div class="panel">
+    <h1>Настройка матча</h1>
+    <h2>Уровень соперника</h2>
+    <div class="seg">
+      <button id="diff-easy">😌 Лёгкий</button>
+      <button id="diff-mid">🙂 Средний</button>
+      <button id="diff-hard">😈 Сложный</button>
+    </div>
+    <h2>Стратегия команды</h2>
+    <div class="seg">
+      <button id="strat-agg">🔥 Агрессивная</button>
+      <button id="strat-mod">⚖️ Умеренная</button>
+      <button id="strat-def">🛡 Защитная</button>
+    </div>
+    <button class="pbtn" id="btn-go">▶ Начать матч</button>
+  </div>
+</div>
+
+<!-- Перерыв -->
+<div class="overlay" id="halftime">
+  <div class="panel">
+    <h1>⏸ Перерыв</h1>
+    <div class="big" id="half-score">0 : 0</div>
+    <p>Первый тайм окончен. Отдышись — и вперёд!</p>
+    <button class="pbtn" id="btn-half-go">▶ 2-й тайм</button>
+  </div>
+</div>
+
+<!-- Магазин -->
+<div class="overlay" id="shop" style="display:none">
+  <div class="panel">
+    <h1>🛒 Магазин</h1>
+    <p>Монеты: 🪙 <span id="shop-coins">0</span></p>
+    <p>Уровень дыхания команды: <b><span id="shop-level">0</span></b></p>
+    <p>Запас воздуха: <b><span id="shop-capacity">32 сек</span></b></p>
+    <button class="pbtn" id="btn-buy">Прокачать дыхание</button>
+    <button class="pbtn alt" id="btn-close-shop">Продолжить</button>
+  </div>
+</div>
+
+<!-- Конец матча -->
+<div class="overlay" id="end">
+  <div class="panel">
+    <h1 id="end-title">🏆 Победа!</h1>
+    <div class="big" id="end-score">0 : 0</div>
+    <p id="end-coins">+0 🪙 за матч</p>
+    <button class="pbtn" id="btn-again">▶ Ещё матч</button>
+    <button class="pbtn alt" id="btn-shop-end">🛒 Магазин</button>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

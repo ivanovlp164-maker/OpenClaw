@@ -6,3 +6,4 @@ state/
 *.pem
 *.key
 .DS_Store
+underwater-football/dist/
